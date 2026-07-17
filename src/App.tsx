@@ -50,6 +50,11 @@ export default function App() {
     dispatch({ type: 'ROLL', d1, d2 });
   };
 
+  const armCheat = () => {
+    cheatRef.current = true;
+    setCheatArmed(true);
+  };
+
   // secret cheat code: type "ajed" to load the next throw
   useEffect(() => {
     const CODE = 'ajed';
@@ -61,13 +66,26 @@ export default function App() {
       cheatBuf.current = (cheatBuf.current + e.key.toLowerCase()).slice(-CODE.length);
       if (cheatBuf.current === CODE) {
         cheatBuf.current = '';
-        cheatRef.current = true;
-        setCheatArmed(true);
+        armCheat();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // same cheat, touch-friendly (iPhone has no keyboard):
+  // tap the ERLEX logo 4× in quick succession — one tap per letter of the code.
+  const tapCount = useRef(0);
+  const tapAt = useRef(0);
+  const onBrandTap = () => {
+    const now = Date.now();
+    tapCount.current = now - tapAt.current < 800 ? tapCount.current + 1 : 1;
+    tapAt.current = now;
+    if (tapCount.current >= 4) {
+      tapCount.current = 0;
+      armCheat();
+    }
+  };
   const ended = canEnd(g);
 
   // reset the "press space again to confirm" arming when it's no longer end-turn time
@@ -122,7 +140,7 @@ export default function App() {
       <div className="wrap">
         <header>
           <div className="brand">
-            <h1>ERLEX{cheatArmed && !g.rolled && <span className="lucky" title="Loaded dice">🍀</span>}</h1>
+            <h1 onClick={onBrandTap}>ERLEX{cheatArmed && !g.rolled && <span className="lucky" title="Loaded dice">🍀</span>}</h1>
             <small>Backgammon · Limited Edition</small>
           </div>
           <div className="score">
@@ -181,8 +199,8 @@ export default function App() {
           key={String(settingsOpen)}
           names={st.names}
           colors={st.colors}
-          onSave={(names, colors) => { dispatch({ type: 'SAVE_SETTINGS', names, colors }); setSettingsOpen(false); }}
-          onResetScores={() => dispatch({ type: 'RESET_SCORES' })}
+          scores={st.scores}
+          onSave={(names, colors, scores) => { dispatch({ type: 'SAVE_SETTINGS', names, colors, scores }); setSettingsOpen(false); }}
           onClose={() => setSettingsOpen(false)}
         />
       )}
@@ -205,23 +223,29 @@ export default function App() {
 }
 
 function Settings({
-  names, colors, onSave, onResetScores, onClose,
+  names, colors, scores, onSave, onClose,
 }: {
   names: Record<Side, string>;
   colors: Record<Side, string>;
-  onSave: (names: Record<Side, string>, colors: Record<Side, string>) => void;
-  onResetScores: () => void;
+  scores: Record<Side, number>;
+  onSave: (names: Record<Side, string>, colors: Record<Side, string>, scores: Record<Side, number>) => void;
   onClose: () => void;
 }) {
   const [ng, setNg] = useState(names.g);
   const [np, setNp] = useState(names.p);
   const [cg, setCg] = useState(colors.g);
   const [cp, setCp] = useState(colors.p);
+  const [sg, setSg] = useState(String(scores.g));
+  const [sp, setSp] = useState(String(scores.p));
+
+  // parse a score input to a non-negative integer (blank / junk → 0)
+  const num = (s: string) => Math.max(0, Math.floor(Number(s) || 0));
 
   const save = () =>
     onSave(
       { g: ng.trim() || 'Player 1', p: np.trim() || 'Player 2' },
       { g: cg, p: cp },
+      { g: num(sg), p: num(sp) },
     );
 
   return (
@@ -232,8 +256,16 @@ function Settings({
         <div className="row"><label>Player 1 colour</label><input type="color" value={cg} onChange={(e) => setCg(e.target.value)} /></div>
         <div className="row"><label>Player 2 name</label><input type="text" value={np} onChange={(e) => setNp(e.target.value)} /></div>
         <div className="row"><label>Player 2 colour</label><input type="color" value={cp} onChange={(e) => setCp(e.target.value)} /></div>
+        <div className="row">
+          <label>Score</label>
+          <div className="scoreedit">
+            <input type="number" inputMode="numeric" min={0} value={sg} onChange={(e) => setSg(e.target.value)} aria-label={`${ng} score`} />
+            <span className="sep">–</span>
+            <input type="number" inputMode="numeric" min={0} value={sp} onChange={(e) => setSp(e.target.value)} aria-label={`${np} score`} />
+          </div>
+        </div>
         <div className="cardbtns">
-          <button className="btn" onClick={onResetScores}>Reset scores</button>
+          <button className="btn" onClick={() => { setSg('0'); setSp('0'); }}>Reset scores</button>
           <button className="btn primary" onClick={save}>Done</button>
         </div>
       </div>

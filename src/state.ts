@@ -31,7 +31,7 @@ export type Action =
   | { type: 'UNDO' }
   | { type: 'END_TURN' }
   | { type: 'NEW_GAME'; first: Side }
-  | { type: 'SAVE_SETTINGS'; names: Record<Side, string>; colors: Record<Side, string> }
+  | { type: 'SAVE_SETTINGS'; names: Record<Side, string>; colors: Record<Side, string>; scores: Record<Side, number> }
   | { type: 'RESET_SCORES' };
 
 const DEFAULT_NAMES: Record<Side, string> = { g: 'Erlend', p: 'Alex' };
@@ -153,7 +153,7 @@ export function reducer(st: AppState, a: Action): AppState {
         highlights: [],
       };
     case 'SAVE_SETTINGS':
-      return { ...st, names: a.names, colors: a.colors };
+      return { ...st, names: a.names, colors: a.colors, scores: a.scores };
     case 'RESET_SCORES':
       return { ...st, scores: { g: 0, p: 0 } };
     default:
