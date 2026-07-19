@@ -197,9 +197,10 @@ export default function App() {
 
         {erlex && (
           <div className="legend">
-            <span className="lgi"><span className="swatch fwd">➜</span> Forward move</span>
-            <span className="lgi"><span className="swatch back">↩</span> Backward move</span>
-            <span className="lgi"><span className="swatch hit">✕</span> Hits a checker</span>
+            <span className="lgi"><span className="swatch fwd">→</span> Forward</span>
+            <span className="lgi"><span className="swatch back">→</span> Backward</span>
+            <span className="lgi"><span className="swatch hit">✕</span> Capture</span>
+            <span className="lgi note">Arrows point the way each move travels.</span>
           </div>
         )}
 

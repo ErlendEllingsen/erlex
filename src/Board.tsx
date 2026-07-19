@@ -1,5 +1,5 @@
 import React from 'react';
-import { Side, Src, OFF } from './engine';
+import { Side, Src, BAR, OFF } from './engine';
 import { AppState, Action, ClickTarget, movableSources } from './state';
 
 function pos(point: number): { col: number; row: number } {
@@ -9,6 +9,22 @@ function pos(point: number): { col: number; row: number } {
   }
   if (point >= 7) return { col: 13 - point, row: 2 };
   return { col: 14 - point, row: 2 };
+}
+
+// grid position of a move source (the bar sits in the centre column)
+function srcPos(src: Src): { col: number; row: number } {
+  return src === BAR ? { col: 7, row: 1.5 } : pos(src + 1);
+}
+
+// The arrow drawn on a landing hint points the way the checker actually travels,
+// from its source point to this destination — so it flips with the board's
+// horseshoe layout instead of being a fixed glyph.
+function travelArrow(from: { col: number; row: number }, destIndex: number): string {
+  const to = pos(destIndex + 1);
+  const dc = to.col - from.col;
+  const dr = to.row - from.row;
+  if (Math.abs(dc) >= Math.abs(dr)) return dc < 0 ? '←' : '→';
+  return dr < 0 ? '↑' : '↓';
 }
 
 function Checkers({ side, count }: { side: Side; count: number }) {
@@ -49,6 +65,7 @@ export default function Board({
       .filter((h) => h.to !== OFF && h.dir === 'back' && !fwdSet.has(h.to as number))
       .map((h) => h.to as number),
   );
+  const from = st.selected === null ? null : srcPos(st.selected);
   const offHL = st.highlights.some((h) => h.to === OFF);
   const click = (target: ClickTarget) => dispatch({ type: 'CLICK', target });
 
@@ -72,7 +89,7 @@ export default function Board({
       >
         {hlSet.has(i) && (
           <div className={`land ${hitSet.has(i) ? 'hit' : ''} ${backSet.has(i) ? 'back' : 'fwd'}`}>
-            <span className="dirmark">{backSet.has(i) ? '↩' : '➜'}</span>
+            {from && <span className="dirmark">{travelArrow(from, i)}</span>}
           </div>
         )}
         <div className="stack">{owner && <Checkers side={owner} count={count} />}</div>
