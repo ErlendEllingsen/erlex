@@ -217,7 +217,7 @@ export default function App() {
       </div>
 
       {strikeShow && (
-        <div className="strike" aria-hidden="true">
+        <div className="strike" key={st.strike} aria-hidden="true">
           <div className="claw claw1" />
           <div className="claw claw2" />
           <div className="claw claw3" />

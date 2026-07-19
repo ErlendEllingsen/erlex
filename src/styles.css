@@ -328,6 +328,15 @@ header { display: flex; align-items: center; justify-content: space-between; gap
   55% { transform: translate(-50%, -50%) scale(1) rotate(-3deg); opacity: 1; }
   100% { transform: translate(-50%, -50%) scale(1.15) rotate(0); opacity: 0; }
 }
+/* Respect reduced motion, but still give the (brief, essential) feedback:
+   drop the fast claw slashing and just fade the lion in and out. */
 @media (prefers-reduced-motion: reduce) {
-  .strike, .strike .claw, .strike .roar { animation-duration: .01ms; }
+  .strike .claw { display: none; }
+  .strike .roar { animation: roarFade .9s ease-out forwards; }
+}
+@keyframes roarFade {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.9); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  70% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
