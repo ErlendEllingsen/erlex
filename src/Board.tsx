@@ -38,6 +38,17 @@ export default function Board({
   const hitSet = new Set(
     st.highlights.filter((h) => h.hit).map((h) => h.to as number),
   );
+  // Erlex backward moves land here — shown in a distinct colour. A point that is
+  // only reachable by moving backwards gets the 'back' hint; if it's also a
+  // forward destination we keep the (clearer) forward hint.
+  const fwdSet = new Set(
+    st.highlights.filter((h) => h.to !== OFF && h.dir === 'fwd').map((h) => h.to as number),
+  );
+  const backSet = new Set(
+    st.highlights
+      .filter((h) => h.to !== OFF && h.dir === 'back' && !fwdSet.has(h.to as number))
+      .map((h) => h.to as number),
+  );
   const offHL = st.highlights.some((h) => h.to === OFF);
   const click = (target: ClickTarget) => dispatch({ type: 'CLICK', target });
 
@@ -59,7 +70,11 @@ export default function Board({
         style={{ gridColumn: p.col, gridRow: p.row }}
         onClick={() => click({ kind: 'point', i })}
       >
-        {hlSet.has(i) && <div className={`land ${hitSet.has(i) ? 'hit' : ''}`} />}
+        {hlSet.has(i) && (
+          <div className={`land ${hitSet.has(i) ? 'hit' : ''} ${backSet.has(i) ? 'back' : 'fwd'}`}>
+            <span className="dirmark">{backSet.has(i) ? '↩' : '➜'}</span>
+          </div>
+        )}
         <div className="stack">{owner && <Checkers side={owner} count={count} />}</div>
       </div>,
     );

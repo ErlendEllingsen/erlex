@@ -123,7 +123,32 @@ header { display: flex; align-items: center; justify-content: space-between; gap
   border: 2.5px dashed var(--gold); background: rgba(255, 213, 74, .16); animation: pulse 1s infinite ease-in-out;
 }
 .land.hit { border-color: #ff5b5b; background: rgba(255, 91, 91, .18); }
+/* Erlex backward-move hint: distinct cyan tint vs. the gold forward hint */
+.land.back { border-color: #38d9ff; background: rgba(56, 217, 255, .18); }
+.land.back.hit { border-color: #ff5b5b; background: rgba(255, 91, 91, .18); border-style: double; }
+.land .dirmark {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 18px; font-weight: 900; line-height: 1; color: var(--gold);
+  text-shadow: 0 0 6px #000; pointer-events: none;
+}
+.land.back .dirmark { color: #38d9ff; }
+.land.hit .dirmark { color: #ff5b5b; }
 @keyframes pulse { 50% { transform: translate(-50%, -50%) scale(1.16); opacity: .6; } }
+
+/* ---- Erlex direction legend ---- */
+.legend {
+  display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 10px 16px; font-size: 14px; font-weight: 700; color: var(--dim);
+}
+.legend .lgi { display: inline-flex; align-items: center; gap: 7px; }
+.legend .swatch {
+  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px;
+  font-size: 14px; font-weight: 900; border: 2px dashed var(--gold);
+  background: rgba(255, 213, 74, .16); color: var(--gold);
+}
+.legend .swatch.back { border-color: #38d9ff; background: rgba(56, 217, 255, .18); color: #38d9ff; }
+.legend .swatch.hit { border-color: #ff5b5b; background: rgba(255, 91, 91, .18); color: #ff5b5b; }
 
 .bar {
   grid-column: 7; grid-row: 1 / 3; display: flex; flex-direction: column;
@@ -244,3 +269,64 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 .win-emoji { font-size: 65px; text-align: center; }
 .cardbtns { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 .cardbtns .btn { flex: 1; }
+
+/* ---- mode picker (settings) ---- */
+.modepick { display: flex; gap: 8px; }
+.modebtn {
+  border: 1px solid var(--line); background: #0d1220; color: var(--dim);
+  border-radius: 12px; padding: 10px 14px; font: inherit; font-weight: 800; cursor: pointer;
+}
+.modebtn.on {
+  color: #08110a; border-color: transparent;
+  background: linear-gradient(90deg, var(--gold), #ffe89a);
+  box-shadow: 0 0 16px -4px var(--gold);
+}
+.modehint { color: var(--dim); font-size: 14px; margin: -2px 0 8px; }
+.scopetag {
+  font-size: 12px; font-weight: 800; color: var(--gold); letter-spacing: .5px;
+  background: rgba(255, 213, 74, .12); border-radius: 8px; padding: 2px 7px; margin-left: 6px;
+}
+.modetag { font-size: 15px; margin-left: 2px; }
+
+/* ---- Erlex lion strike (fires briefly when a checker is hit) ---- */
+.strike {
+  position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: hidden;
+  animation: strikeFlash .9s ease-out forwards;
+}
+@keyframes strikeFlash {
+  0% { background: rgba(255, 60, 40, .28); }
+  40% { background: rgba(255, 60, 40, .10); }
+  100% { background: transparent; }
+}
+.strike .claw {
+  position: absolute; top: -20%; left: 50%; width: 8%; height: 150%;
+  background: linear-gradient(180deg, transparent, #fff5, #fff, #ffd54a, #fff, #fff5, transparent);
+  border-radius: 50%;
+  filter: blur(1px) drop-shadow(0 0 10px #fff);
+  transform-origin: top center; transform: translateX(-50%) rotate(20deg) scaleY(0);
+  animation: clawSlash .55s cubic-bezier(.2, .8, .2, 1) forwards;
+}
+.strike .claw1 { left: 34%; animation-delay: 0s; }
+.strike .claw2 { left: 50%; height: 165%; animation-delay: .05s; }
+.strike .claw3 { left: 66%; animation-delay: .1s; }
+@keyframes clawSlash {
+  0% { transform: translateX(-50%) rotate(20deg) scaleY(0); opacity: 0; }
+  25% { opacity: 1; }
+  60% { transform: translateX(-50%) rotate(20deg) scaleY(1); opacity: 1; }
+  100% { transform: translateX(-50%) rotate(20deg) scaleY(1); opacity: 0; }
+}
+.strike .roar {
+  position: absolute; top: 50%; left: 50%; font-size: 128px; line-height: 1;
+  transform: translate(-50%, -50%) scale(0);
+  filter: drop-shadow(0 0 24px #ff8c3c);
+  animation: roarPop .9s cubic-bezier(.2, 1.4, .3, 1) forwards;
+}
+@keyframes roarPop {
+  0% { transform: translate(-50%, -50%) scale(0) rotate(-18deg); opacity: 0; }
+  30% { transform: translate(-50%, -50%) scale(1.25) rotate(6deg); opacity: 1; }
+  55% { transform: translate(-50%, -50%) scale(1) rotate(-3deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.15) rotate(0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .strike, .strike .claw, .strike .roar { animation-duration: .01ms; }
+}

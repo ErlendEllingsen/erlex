@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { Side, pipCount } from './engine';
+import { Side, GameMode, pipCount } from './engine';
 import {
-  reducer, loadInitial, persist, diceDisplay, canEnd,
+  reducer, loadInitial, persist, diceDisplay, canEnd, Scores,
 } from './state';
 import Board from './Board';
 
@@ -28,9 +28,21 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [endArmed, setEndArmed] = useState(false);
   const [cheatArmed, setCheatArmed] = useState(false);
+  const [strikeShow, setStrikeShow] = useState(false);
   const cheatRef = useRef(false); // source of truth read by roll()
   const cheatBuf = useRef('');    // rolling buffer for the secret sequence
   const g = st.game;
+  const erlex = st.mode === 'erlex';
+
+  // Erlex flourish: when a checker is hit, flash a lion strike across the screen.
+  const prevStrike = useRef(st.strike);
+  useEffect(() => {
+    if (st.strike === prevStrike.current) return;
+    prevStrike.current = st.strike;
+    setStrikeShow(true);
+    const t = setTimeout(() => setStrikeShow(false), 900);
+    return () => clearTimeout(t);
+  }, [st.strike]);
 
   // persist on any meaningful change
   useEffect(() => { persist(st); }, [st.game, st.names, st.colors, st.scores]);
@@ -141,16 +153,17 @@ export default function App() {
         <header>
           <div className="brand">
             <h1 onClick={onBrandTap}>ERLEX{cheatArmed && !g.rolled && <span className="lucky" title="Loaded dice">🍀</span>}</h1>
-            <small>Backgammon · Limited Edition</small>
+            <small>Backgammon · {erlex ? 'Erlex version 🦁' : 'Classic'}</small>
           </div>
-          <div className="score">
+          <div className="score" title={`${erlex ? 'Erlex version' : 'Classic'} score`}>
             <span className="dot gc" />
             <span>{st.names.g}</span>
-            <span className="s">{st.scores.g}</span>
+            <span className="s">{st.scores[st.mode].g}</span>
             <span style={{ color: 'var(--dim)' }}>–</span>
-            <span className="s">{st.scores.p}</span>
+            <span className="s">{st.scores[st.mode].p}</span>
             <span>{st.names.p}</span>
             <span className="dot pc" />
+            <span className="modetag">{erlex ? '🦁' : '♟'}</span>
           </div>
           <button className="gear" title="Settings" onClick={() => setSettingsOpen(true)}>⚙</button>
         </header>
@@ -182,6 +195,14 @@ export default function App() {
 
         <Board st={st} dispatch={dispatch} />
 
+        {erlex && (
+          <div className="legend">
+            <span className="lgi"><span className="swatch fwd">➜</span> Forward move</span>
+            <span className="lgi"><span className="swatch back">↩</span> Backward move</span>
+            <span className="lgi"><span className="swatch hit">✕</span> Hits a checker</span>
+          </div>
+        )}
+
         <div className="controls">
           <button className="btn" disabled={!st.history.length} onClick={() => dispatch({ type: 'UNDO' })}>↶ Undo</button>
           {ended && !g.winner && (
@@ -194,13 +215,23 @@ export default function App() {
         <div className="rotate">↻ Tip: rotate to landscape for a bigger board.</div>
       </div>
 
+      {strikeShow && (
+        <div className="strike" aria-hidden="true">
+          <div className="claw claw1" />
+          <div className="claw claw2" />
+          <div className="claw claw3" />
+          <div className="roar">🦁</div>
+        </div>
+      )}
+
       {settingsOpen && (
         <Settings
           key={String(settingsOpen)}
           names={st.names}
           colors={st.colors}
           scores={st.scores}
-          onSave={(names, colors, scores) => { dispatch({ type: 'SAVE_SETTINGS', names, colors, scores }); setSettingsOpen(false); }}
+          mode={st.mode}
+          onSave={(names, colors, scores, mode) => { dispatch({ type: 'SAVE_SETTINGS', names, colors, scores, mode }); setSettingsOpen(false); }}
           onClose={() => setSettingsOpen(false)}
         />
       )}
@@ -223,49 +254,80 @@ export default function App() {
 }
 
 function Settings({
-  names, colors, scores, onSave, onClose,
+  names, colors, scores, mode, onSave, onClose,
 }: {
   names: Record<Side, string>;
   colors: Record<Side, string>;
-  scores: Record<Side, number>;
-  onSave: (names: Record<Side, string>, colors: Record<Side, string>, scores: Record<Side, number>) => void;
+  scores: Scores;
+  mode: GameMode;
+  onSave: (names: Record<Side, string>, colors: Record<Side, string>, scores: Scores, mode: GameMode) => void;
   onClose: () => void;
 }) {
   const [ng, setNg] = useState(names.g);
   const [np, setNp] = useState(names.p);
   const [cg, setCg] = useState(colors.g);
   const [cp, setCp] = useState(colors.p);
-  const [sg, setSg] = useState(String(scores.g));
-  const [sp, setSp] = useState(String(scores.p));
+  const [md, setMd] = useState<GameMode>(mode);
+  // keep both modes' scores as editable strings so switching the toggle doesn't lose edits
+  const [sc, setSc] = useState<Record<GameMode, { g: string; p: string }>>({
+    classic: { g: String(scores.classic.g), p: String(scores.classic.p) },
+    erlex: { g: String(scores.erlex.g), p: String(scores.erlex.p) },
+  });
 
   // parse a score input to a non-negative integer (blank / junk → 0)
   const num = (s: string) => Math.max(0, Math.floor(Number(s) || 0));
+  const setScore = (m: GameMode, side: Side, v: string) =>
+    setSc((prev) => ({ ...prev, [m]: { ...prev[m], [side]: v } }));
 
   const save = () =>
     onSave(
       { g: ng.trim() || 'Player 1', p: np.trim() || 'Player 2' },
       { g: cg, p: cp },
-      { g: num(sg), p: num(sp) },
+      {
+        classic: { g: num(sc.classic.g), p: num(sc.classic.p) },
+        erlex: { g: num(sc.erlex.g), p: num(sc.erlex.p) },
+      },
+      md,
     );
 
   return (
     <div className="overlay show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="card">
         <h2>Settings</h2>
+        <div className="row">
+          <label>Game mode</label>
+          <div className="modepick">
+            <button
+              type="button"
+              className={'modebtn' + (md === 'classic' ? ' on' : '')}
+              onClick={() => setMd('classic')}
+            >Classic</button>
+            <button
+              type="button"
+              className={'modebtn' + (md === 'erlex' ? ' on' : '')}
+              onClick={() => setMd('erlex')}
+            >Erlex version 🦁</button>
+          </div>
+        </div>
+        <div className="modehint">
+          {md === 'erlex'
+            ? 'Erlex version: checkers may also move backwards, and hitting a checker unleashes a lion strike.'
+            : 'Classic backgammon rules.'}
+        </div>
         <div className="row"><label>Player 1 name</label><input type="text" value={ng} onChange={(e) => setNg(e.target.value)} /></div>
         <div className="row"><label>Player 1 colour</label><input type="color" value={cg} onChange={(e) => setCg(e.target.value)} /></div>
         <div className="row"><label>Player 2 name</label><input type="text" value={np} onChange={(e) => setNp(e.target.value)} /></div>
         <div className="row"><label>Player 2 colour</label><input type="color" value={cp} onChange={(e) => setCp(e.target.value)} /></div>
         <div className="row">
-          <label>Score</label>
+          <label>Score <span className="scopetag">{md === 'erlex' ? 'Erlex 🦁' : 'Classic'}</span></label>
           <div className="scoreedit">
-            <input type="number" inputMode="numeric" min={0} value={sg} onChange={(e) => setSg(e.target.value)} aria-label={`${ng} score`} />
+            <input type="number" inputMode="numeric" min={0} value={sc[md].g} onChange={(e) => setScore(md, 'g', e.target.value)} aria-label={`${ng} ${md} score`} />
             <span className="sep">–</span>
-            <input type="number" inputMode="numeric" min={0} value={sp} onChange={(e) => setSp(e.target.value)} aria-label={`${np} score`} />
+            <input type="number" inputMode="numeric" min={0} value={sc[md].p} onChange={(e) => setScore(md, 'p', e.target.value)} aria-label={`${np} ${md} score`} />
           </div>
         </div>
         <div className="cardbtns">
-          <button className="btn" onClick={() => { setSg('0'); setSp('0'); }}>Reset scores</button>
+          <button className="btn" onClick={() => setSc((p) => ({ ...p, [md]: { g: '0', p: '0' } }))}>Reset {md === 'erlex' ? 'Erlex' : 'Classic'} score</button>
           <button className="btn primary" onClick={save}>Done</button>
         </div>
       </div>

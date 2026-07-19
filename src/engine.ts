@@ -4,6 +4,9 @@
 // 'g' moves index high->low (bears off below 0). 'p' moves low->high (bears off above 23).
 
 export type Side = 'g' | 'p';
+// 'classic' = standard backgammon. 'erlex' = Erlex version: checkers may also move
+// backwards (opposite the bearing-off direction).
+export type GameMode = 'classic' | 'erlex';
 export const OFF = 'off';
 export const BAR = 'bar';
 export type Src = number | typeof BAR;
@@ -18,6 +21,7 @@ export interface GameState {
   remaining: number[];
   winner: Side | null;
   rolled: boolean;
+  mode: GameMode;
 }
 
 export interface Move {
@@ -25,12 +29,13 @@ export interface Move {
   die: number;
   hit: boolean;
   exact: boolean;
+  dir: 'fwd' | 'back'; // 'back' only occurs in Erlex mode
 }
 
 export const sign = (pl: Side): number => (pl === 'g' ? 1 : -1);
 export const opp = (pl: Side): Side => (pl === 'g' ? 'p' : 'g');
 
-export function newGameState(first: Side): GameState {
+export function newGameState(first: Side, mode: GameMode = 'classic'): GameState {
   const board = new Array(24).fill(0);
   board[23] = 2; board[12] = 5; board[7] = 3; board[5] = 5;         // g
   board[0] = -2; board[11] = -5; board[16] = -3; board[18] = -5;    // p
@@ -43,6 +48,7 @@ export function newGameState(first: Side): GameState {
     remaining: [],
     winner: null,
     rolled: false,
+    mode,
   };
 }
 
@@ -81,7 +87,7 @@ export function legalDest(g: GameState, src: Src, d: number, pl: Side): Move | n
   if (src === BAR) {
     if (g.bar[pl] <= 0) return null;
     const e = pl === 'g' ? 24 - d : d - 1;
-    if (canLand(g, e, pl)) return { to: e, die: d, hit: isHit(g, e, pl), exact: false };
+    if (canLand(g, e, pl)) return { to: e, die: d, hit: isHit(g, e, pl), exact: false, dir: 'fwd' };
     return null;
   }
   const i = src;
@@ -89,14 +95,37 @@ export function legalDest(g: GameState, src: Src, d: number, pl: Side): Move | n
   const t = i - s * d; // g: i-d, p: i+d
   const bearing = pl === 'g' ? t < 0 : t > 23;
   if (!bearing) {
-    if (canLand(g, t, pl)) return { to: t, die: d, hit: isHit(g, t, pl), exact: false };
+    if (canLand(g, t, pl)) return { to: t, die: d, hit: isHit(g, t, pl), exact: false, dir: 'fwd' };
     return null;
   }
   if (!allInHome(g, pl)) return null;
   const pip = pl === 'g' ? i + 1 : 24 - i;
-  if (d === pip) return { to: OFF, die: d, hit: false, exact: true };
-  if (d > pip && i === furthestHome(g, pl)) return { to: OFF, die: d, hit: false, exact: false };
+  if (d === pip) return { to: OFF, die: d, hit: false, exact: true, dir: 'fwd' };
+  if (d > pip && i === furthestHome(g, pl)) return { to: OFF, die: d, hit: false, exact: false, dir: 'fwd' };
   return null;
+}
+
+// Erlex rule: a checker may move against its bearing-off direction, staying on the
+// board (no backwards bearing-off, no backwards entry from the bar).
+export function legalDestBack(g: GameState, src: Src, d: number, pl: Side): Move | null {
+  if (g.mode !== 'erlex' || src === BAR || g.bar[pl] > 0) return null;
+  const i = src;
+  const s = sign(pl);
+  if (pl === 'g' ? g.board[i] <= 0 : g.board[i] >= 0) return null; // no own checker here
+  const t = i + s * d; // opposite of the forward direction
+  if (t < 0 || t > 23) return null;
+  if (canLand(g, t, pl)) return { to: t, die: d, hit: isHit(g, t, pl), exact: false, dir: 'back' };
+  return null;
+}
+
+// All legal destinations for one (src, die): forward plus, in Erlex mode, backward.
+function destsFor(g: GameState, src: Src, d: number, pl: Side): Move[] {
+  const out: Move[] = [];
+  const f = legalDest(g, src, d, pl);
+  if (f) out.push(f);
+  const b = legalDestBack(g, src, d, pl);
+  if (b) out.push(b);
+  return out;
 }
 
 export function sources(g: GameState, pl: Side): Src[] {
@@ -108,16 +137,13 @@ export function sources(g: GameState, pl: Side): Src[] {
 
 export function hasAnyLegal(g: GameState, pl: Side): boolean {
   const dice = [...new Set(g.remaining)];
-  for (const src of sources(g, pl)) for (const d of dice) if (legalDest(g, src, d, pl)) return true;
+  for (const src of sources(g, pl)) for (const d of dice) if (destsFor(g, src, d, pl).length) return true;
   return false;
 }
 
 export function legalMovesFrom(g: GameState, src: Src, pl: Side): Move[] {
   const res: Move[] = [];
-  for (const d of new Set(g.remaining)) {
-    const dest = legalDest(g, src, d, pl);
-    if (dest) res.push(dest);
-  }
+  for (const d of new Set(g.remaining)) res.push(...destsFor(g, src, d, pl));
   return res;
 }
 

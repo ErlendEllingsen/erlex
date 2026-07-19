@@ -1,5 +1,5 @@
 import {
-  GameState, Side, Src, Dest, Move, BAR, OFF,
+  GameState, GameMode, Side, Src, Dest, Move, BAR, OFF,
   newGameState, opp, legalMovesFrom, hasAnyLegal, sources, applyMove,
 } from './engine';
 
@@ -10,6 +10,11 @@ export interface Snapshot {
   remaining: number[];
 }
 
+// Scores are tracked independently per game mode.
+export type Scores = Record<GameMode, Record<Side, number>>;
+
+const zeroScores = (): Scores => ({ classic: { g: 0, p: 0 }, erlex: { g: 0, p: 0 } });
+
 export interface AppState {
   game: GameState;
   history: Snapshot[];
@@ -17,7 +22,9 @@ export interface AppState {
   highlights: Move[];
   names: Record<Side, string>;
   colors: Record<Side, string>;
-  scores: Record<Side, number>;
+  scores: Scores; // per-mode: scores[mode][side]
+  mode: GameMode;
+  strike: number; // bumps on every hit — drives the Erlex lion strike animation
 }
 
 export type ClickTarget =
@@ -31,7 +38,7 @@ export type Action =
   | { type: 'UNDO' }
   | { type: 'END_TURN' }
   | { type: 'NEW_GAME'; first: Side }
-  | { type: 'SAVE_SETTINGS'; names: Record<Side, string>; colors: Record<Side, string>; scores: Record<Side, number> }
+  | { type: 'SAVE_SETTINGS'; names: Record<Side, string>; colors: Record<Side, string>; scores: Scores; mode: GameMode }
   | { type: 'RESET_SCORES' };
 
 const DEFAULT_NAMES: Record<Side, string> = { g: 'Erlend', p: 'Alex' };
@@ -79,13 +86,15 @@ function applyClickMove(st: AppState, to: Dest): AppState {
   const game = applyMove(g, st.selected, to, e.die, e.hit);
   let scores = st.scores;
   if (game.winner && !g.winner) {
-    scores = { ...scores, [game.turn]: scores[game.turn] + 1 };
+    const m = st.mode;
+    scores = { ...scores, [m]: { ...scores[m], [game.turn]: scores[m][game.turn] + 1 } };
   }
   const base: AppState = {
     ...st,
     game,
     history: [...st.history, snap],
     scores,
+    strike: e.hit ? st.strike + 1 : st.strike,
     selected: null,
     highlights: [],
   };
@@ -147,15 +156,23 @@ export function reducer(st: AppState, a: Action): AppState {
     case 'NEW_GAME':
       return {
         ...st,
-        game: newGameState(a.first),
+        game: newGameState(a.first, st.mode),
         history: [],
         selected: null,
         highlights: [],
       };
     case 'SAVE_SETTINGS':
-      return { ...st, names: a.names, colors: a.colors, scores: a.scores };
+      return {
+        ...st,
+        names: a.names,
+        colors: a.colors,
+        scores: a.scores,
+        mode: a.mode,
+        // apply the chosen mode to the game in progress so it takes effect at once
+        game: { ...st.game, mode: a.mode },
+      };
     case 'RESET_SCORES':
-      return { ...st, scores: { g: 0, p: 0 } };
+      return { ...st, scores: zeroScores() };
     default:
       return st;
   }
@@ -195,6 +212,26 @@ export function movableSources(st: AppState): Set<Src> {
 
 const KEY = 'erlex_react_v1';
 
+// Read persisted scores in either shape: the new per-mode object, or the old
+// flat { g, p } (which predates game modes — those wins are credited to classic).
+function migrateScores(raw: unknown): Scores {
+  const out = zeroScores();
+  if (!raw || typeof raw !== 'object') return out;
+  const r = raw as Record<string, unknown>;
+  const asPair = (v: unknown): Record<Side, number> | null => {
+    if (!v || typeof v !== 'object') return null;
+    const o = v as Record<string, unknown>;
+    return { g: Number(o.g) || 0, p: Number(o.p) || 0 };
+  };
+  if ('classic' in r || 'erlex' in r) {
+    out.classic = asPair(r.classic) ?? out.classic;
+    out.erlex = asPair(r.erlex) ?? out.erlex;
+  } else if ('g' in r || 'p' in r) {
+    out.classic = asPair(r) ?? out.classic; // legacy flat scores → classic
+  }
+  return out;
+}
+
 export function loadInitial(): AppState {
   const base: AppState = {
     game: newGameState(Math.random() < 0.5 ? 'g' : 'p'),
@@ -203,19 +240,23 @@ export function loadInitial(): AppState {
     highlights: [],
     names: { ...DEFAULT_NAMES },
     colors: { ...DEFAULT_COLORS },
-    scores: { g: 0, p: 0 },
+    scores: zeroScores(),
+    mode: 'classic',
+    strike: 0,
   };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw);
       if (s.game && Array.isArray(s.game.board) && s.game.board.length === 24) {
+        const mode: GameMode = s.mode === 'erlex' ? 'erlex' : s.game.mode === 'erlex' ? 'erlex' : 'classic';
         const merged: AppState = {
           ...base,
-          game: s.game,
+          game: { ...s.game, mode },
           names: s.names ?? base.names,
           colors: s.colors ?? base.colors,
-          scores: s.scores ?? base.scores,
+          scores: migrateScores(s.scores),
+          mode,
         };
         return { ...merged, ...selectionFor(merged.game) };
       }
@@ -227,9 +268,9 @@ export function loadInitial(): AppState {
 }
 
 export function persist(st: AppState): void {
-  const { game, names, colors, scores } = st;
+  const { game, names, colors, scores, mode } = st;
   try {
-    localStorage.setItem(KEY, JSON.stringify({ game, names, colors, scores }));
+    localStorage.setItem(KEY, JSON.stringify({ game, names, colors, scores, mode }));
   } catch {
     /* storage may be unavailable (private mode) — non-fatal */
   }
