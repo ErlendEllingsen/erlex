@@ -143,9 +143,6 @@ export default function App() {
     banner = <><span className={`who ${wcls}`}>{st.names[g.turn]}</span> — tap Roll</>;
   } else if (ended && g.remaining.length) {
     banner = <><span className={`who ${wcls}`}>{st.names[g.turn]}</span> — no moves</>;
-  } else if (g.bar[g.turn] > 0) {
-    // a checker on the bar must re-enter before anything else can move
-    banner = <><span className={`who ${wcls}`}>{st.names[g.turn]}</span> — enter from the bar 🚧</>;
   } else {
     banner = <><span className={`who ${wcls}`}>{st.names[g.turn]}</span> to move</>;
   }
