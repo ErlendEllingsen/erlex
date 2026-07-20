@@ -71,6 +71,13 @@ function allInHome(g: GameState, pl: Side): boolean {
   for (let i = 0; i < 18; i++) if (g.board[i] < 0) return false;
   return true;
 }
+// A side's "safe zone" is its own home board — the six points where it bears off.
+// g bears off through points 1-6 (indices 0-5); p through points 19-24 (18-23).
+// In Erlex mode a checker resting in its own safe zone cannot be hit by a backward move.
+export function inSafeZone(idx: number, side: Side): boolean {
+  return side === 'g' ? idx >= 0 && idx <= 5 : idx >= 18 && idx <= 23;
+}
+
 // index of the checker furthest from bearing off, within the home board
 function furthestHome(g: GameState, pl: Side): number {
   if (pl === 'g') {
@@ -114,8 +121,11 @@ export function legalDestBack(g: GameState, src: Src, d: number, pl: Side): Move
   if (pl === 'g' ? g.board[i] <= 0 : g.board[i] >= 0) return null; // no own checker here
   const t = i + s * d; // opposite of the forward direction
   if (t < 0 || t > 23) return null;
-  if (canLand(g, t, pl)) return { to: t, die: d, hit: isHit(g, t, pl), exact: false, dir: 'back' };
-  return null;
+  if (!canLand(g, t, pl)) return null;
+  const hit = isHit(g, t, pl);
+  // Safe zone: a backward move may not capture a checker resting in its own home board.
+  if (hit && inSafeZone(t, opp(pl))) return null;
+  return { to: t, die: d, hit, exact: false, dir: 'back' };
 }
 
 // All legal destinations for one (src, die): forward plus, in Erlex mode, backward.

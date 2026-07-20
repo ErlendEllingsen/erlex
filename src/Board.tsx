@@ -1,5 +1,5 @@
 import React from 'react';
-import { Side, Src, BAR, OFF } from './engine';
+import { Side, Src, BAR, OFF, inSafeZone } from './engine';
 import { AppState, Action, ClickTarget, movableSources } from './state';
 
 function pos(point: number): { col: number; row: number } {
@@ -27,13 +27,13 @@ function travelArrow(from: { col: number; row: number }, destIndex: number): str
   return dr < 0 ? '↑' : '↓';
 }
 
-function Checkers({ side, count }: { side: Side; count: number }) {
+function Checkers({ side, count, safe }: { side: Side; count: number; safe?: boolean }) {
   const show = Math.min(count, 5);
   return (
     <>
       {count > 5 && <div className="cnt">{count}</div>}
       {Array.from({ length: show }).map((_, n) => (
-        <div key={n} className={`checker ${side}`} />
+        <div key={n} className={`checker ${side}${safe ? ' safe' : ''}`} />
       ))}
     </>
   );
@@ -47,6 +47,7 @@ export default function Board({
   dispatch: React.Dispatch<Action>;
 }) {
   const g = st.game;
+  const erlex = g.mode === 'erlex';
   const mov = movableSources(st);
   const hlSet = new Set(
     st.highlights.filter((h) => h.to !== OFF).map((h) => h.to as number),
@@ -80,6 +81,8 @@ export default function Board({
     const cls = ['point', top ? 'top' : 'bottom', shade];
     if (mov.has(i)) cls.push('movable');
     if (st.selected === i) cls.push('sel');
+    // Erlex: a checker resting in its owner's home board is "safe" from backward hits.
+    const safe = erlex && owner !== null && inSafeZone(i, owner);
     points.push(
       <div
         key={point}
@@ -92,7 +95,7 @@ export default function Board({
             {from && <span className="dirmark">{travelArrow(from, i)}</span>}
           </div>
         )}
-        <div className="stack">{owner && <Checkers side={owner} count={count} />}</div>
+        <div className="stack">{owner && <Checkers side={owner} count={count} safe={safe} />}</div>
       </div>,
     );
   }
@@ -103,6 +106,17 @@ export default function Board({
       <div className="field" style={{ gridColumn: '8 / 14', gridRow: 1 }} />
       <div className="field" style={{ gridColumn: '1 / 7', gridRow: 2 }} />
       <div className="field" style={{ gridColumn: '8 / 14', gridRow: 2 }} />
+
+      {erlex && (
+        <>
+          <div className="safezone p" style={{ gridColumn: '8 / 14', gridRow: 1 }}>
+            <span className="sztag">🛡 {st.names.p} safe zone</span>
+          </div>
+          <div className="safezone g" style={{ gridColumn: '8 / 14', gridRow: 2 }}>
+            <span className="sztag">🛡 {st.names.g} safe zone</span>
+          </div>
+        </>
+      )}
 
       {points}
 

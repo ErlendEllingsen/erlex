@@ -200,6 +200,7 @@ export default function App() {
             <span className="lgi"><span className="swatch fwd">→</span> Forward</span>
             <span className="lgi"><span className="swatch back">→</span> Backward</span>
             <span className="lgi"><span className="swatch hit">✕</span> Capture</span>
+            <span className="lgi"><span className="swatch safe">🛡</span> Safe zone — no backward hits here</span>
             <span className="lgi note">Arrows point the way each move travels.</span>
           </div>
         )}
@@ -312,7 +313,7 @@ function Settings({
         </div>
         <div className="modehint">
           {md === 'erlex'
-            ? 'Erlex version: checkers may also move backwards, and hitting a checker unleashes a lion strike.'
+            ? 'Erlex version: checkers may also move backwards, each player’s home board is a safe zone (no backward hits there), and hitting a checker unleashes a lion strike.'
             : 'Classic backgammon rules.'}
         </div>
         <div className="row"><label>Player 1 name</label><input type="text" value={ng} onChange={(e) => setNg(e.target.value)} /></div>
