@@ -317,7 +317,7 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 .cardbtns .btn { flex: 1; }
 
 /* ---- mode picker (settings) ---- */
-.modepick { display: flex; gap: 8px; }
+.modepick { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .modebtn {
   border: 1px solid var(--line); background: #0d1220; color: var(--dim);
   border-radius: 12px; padding: 10px 14px; font: inherit; font-weight: 800; cursor: pointer;

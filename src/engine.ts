@@ -4,9 +4,14 @@
 // 'g' moves index high->low (bears off below 0). 'p' moves low->high (bears off above 23).
 
 export type Side = 'g' | 'p';
-// 'classic' = standard backgammon. 'erlex' = Erlex version: checkers may also move
-// backwards (opposite the bearing-off direction).
-export type GameMode = 'classic' | 'erlex';
+// 'classic' = standard backgammon.
+// 'erlex'   = Erlex version: checkers may also move backwards (opposite the
+//             bearing-off direction), and each home board is a protected safe zone.
+// 'erlex2'  = Erlex² (Erlend to the power of two): identical to Erlex but with NO
+//             safe zone — backward moves may enter anywhere.
+export type GameMode = 'classic' | 'erlex' | 'erlex2';
+// Modes in which backward movement is allowed.
+export const allowsBackward = (m: GameMode): boolean => m === 'erlex' || m === 'erlex2';
 export const OFF = 'off';
 export const BAR = 'bar';
 export type Src = number | typeof BAR;
@@ -115,14 +120,14 @@ export function legalDest(g: GameState, src: Src, d: number, pl: Side): Move | n
 // Erlex rule: a checker may move against its bearing-off direction, staying on the
 // board (no backwards bearing-off, no backwards entry from the bar).
 export function legalDestBack(g: GameState, src: Src, d: number, pl: Side): Move | null {
-  if (g.mode !== 'erlex' || src === BAR || g.bar[pl] > 0) return null;
+  if (!allowsBackward(g.mode) || src === BAR || g.bar[pl] > 0) return null;
   const i = src;
   const s = sign(pl);
   if (pl === 'g' ? g.board[i] <= 0 : g.board[i] >= 0) return null; // no own checker here
   const t = i + s * d; // opposite of the forward direction
   if (t < 0 || t > 23) return null;
-  // Safe zone: a backward move may not enter the opponent's home board at all.
-  if (inSafeZone(t, opp(pl))) return null;
+  // Safe zone (Erlex only): a backward move may not enter the opponent's home board.
+  if (g.mode === 'erlex' && inSafeZone(t, opp(pl))) return null;
   if (!canLand(g, t, pl)) return null;
   return { to: t, die: d, hit: isHit(g, t, pl), exact: false, dir: 'back' };
 }

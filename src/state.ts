@@ -13,7 +13,11 @@ export interface Snapshot {
 // Scores are tracked independently per game mode.
 export type Scores = Record<GameMode, Record<Side, number>>;
 
-const zeroScores = (): Scores => ({ classic: { g: 0, p: 0 }, erlex: { g: 0, p: 0 } });
+const zeroScores = (): Scores => ({
+  classic: { g: 0, p: 0 },
+  erlex: { g: 0, p: 0 },
+  erlex2: { g: 0, p: 0 },
+});
 
 export interface AppState {
   game: GameState;
@@ -223,9 +227,10 @@ function migrateScores(raw: unknown): Scores {
     const o = v as Record<string, unknown>;
     return { g: Number(o.g) || 0, p: Number(o.p) || 0 };
   };
-  if ('classic' in r || 'erlex' in r) {
+  if ('classic' in r || 'erlex' in r || 'erlex2' in r) {
     out.classic = asPair(r.classic) ?? out.classic;
     out.erlex = asPair(r.erlex) ?? out.erlex;
+    out.erlex2 = asPair(r.erlex2) ?? out.erlex2;
   } else if ('g' in r || 'p' in r) {
     out.classic = asPair(r) ?? out.classic; // legacy flat scores → classic
   }
@@ -249,7 +254,9 @@ export function loadInitial(): AppState {
     if (raw) {
       const s = JSON.parse(raw);
       if (s.game && Array.isArray(s.game.board) && s.game.board.length === 24) {
-        const mode: GameMode = s.mode === 'erlex' ? 'erlex' : s.game.mode === 'erlex' ? 'erlex' : 'classic';
+        const asMode = (v: unknown): GameMode | null =>
+          v === 'erlex' || v === 'erlex2' || v === 'classic' ? v : null;
+        const mode: GameMode = asMode(s.mode) ?? asMode(s.game.mode) ?? 'classic';
         const merged: AppState = {
           ...base,
           game: { ...s.game, mode },
