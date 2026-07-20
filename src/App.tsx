@@ -195,16 +195,6 @@ export default function App() {
 
         <Board st={st} dispatch={dispatch} />
 
-        {erlex && (
-          <div className="legend">
-            <span className="lgi"><span className="swatch fwd">→</span> Forward</span>
-            <span className="lgi"><span className="swatch back">→</span> Backward</span>
-            <span className="lgi"><span className="swatch hit">✕</span> Capture</span>
-            <span className="lgi"><span className="swatch safe">🛡</span> Safe zone — no backward hits here</span>
-            <span className="lgi note">Arrows point the way each move travels.</span>
-          </div>
-        )}
-
         <div className="controls">
           <button className="btn" disabled={!st.history.length} onClick={() => dispatch({ type: 'UNDO' })}>↶ Undo</button>
           {ended && !g.winner && (
@@ -214,6 +204,16 @@ export default function App() {
           )}
           <button className="btn warn" onClick={confirmNew}>↻ New game</button>
         </div>
+
+        {erlex && (
+          <div className="legend">
+            <span className="lgi"><span className="swatch fwd">→</span> Forward</span>
+            <span className="lgi"><span className="swatch back">→</span> Backward</span>
+            <span className="lgi"><span className="swatch hit">✕</span> Capture</span>
+            <span className="lgi"><span className="swatch safe">🛡</span> Safe zone — no backward entry</span>
+            <span className="lgi note">Arrows point the way each move travels.</span>
+          </div>
+        )}
         <div className="rotate">↻ Tip: rotate to landscape for a bigger board.</div>
       </div>
 
@@ -313,7 +313,7 @@ function Settings({
         </div>
         <div className="modehint">
           {md === 'erlex'
-            ? 'Erlex version: checkers may also move backwards, each player’s home board is a safe zone (no backward hits there), and hitting a checker unleashes a lion strike.'
+            ? 'Erlex version: checkers may also move backwards, each player’s home board is a safe zone the opponent can’t move backward into, and hitting a checker unleashes a lion strike.'
             : 'Classic backgammon rules.'}
         </div>
         <div className="row"><label>Player 1 name</label><input type="text" value={ng} onChange={(e) => setNg(e.target.value)} /></div>

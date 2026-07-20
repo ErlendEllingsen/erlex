@@ -121,11 +121,10 @@ export function legalDestBack(g: GameState, src: Src, d: number, pl: Side): Move
   if (pl === 'g' ? g.board[i] <= 0 : g.board[i] >= 0) return null; // no own checker here
   const t = i + s * d; // opposite of the forward direction
   if (t < 0 || t > 23) return null;
+  // Safe zone: a backward move may not enter the opponent's home board at all.
+  if (inSafeZone(t, opp(pl))) return null;
   if (!canLand(g, t, pl)) return null;
-  const hit = isHit(g, t, pl);
-  // Safe zone: a backward move may not capture a checker resting in its own home board.
-  if (hit && inSafeZone(t, opp(pl))) return null;
-  return { to: t, die: d, hit, exact: false, dir: 'back' };
+  return { to: t, die: d, hit: isHit(g, t, pl), exact: false, dir: 'back' };
 }
 
 // All legal destinations for one (src, die): forward plus, in Erlex mode, backward.

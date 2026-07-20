@@ -137,14 +137,14 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 
 /* ---- Erlex direction legend ---- */
 .legend {
-  display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: center;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-  padding: 10px 16px; font-size: 14px; font-weight: 700; color: var(--dim);
+  display: flex; flex-wrap: wrap; gap: 5px 14px; justify-content: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 7px 14px; font-size: 13px; font-weight: 700; color: var(--dim);
 }
-.legend .lgi { display: inline-flex; align-items: center; gap: 7px; }
+.legend .lgi { display: inline-flex; align-items: center; gap: 6px; }
 .legend .swatch {
-  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px;
-  font-size: 14px; font-weight: 900; border: 2px dashed var(--gold);
+  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px;
+  font-size: 12px; font-weight: 900; border: 2px dashed var(--gold);
   background: rgba(255, 213, 74, .16); color: var(--gold);
 }
 .legend .swatch.back { border-color: #38d9ff; background: rgba(56, 217, 255, .18); color: #38d9ff; }
