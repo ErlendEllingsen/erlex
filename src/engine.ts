@@ -27,6 +27,10 @@ export interface GameState {
   winner: Side | null;
   rolled: boolean;
   mode: GameMode;
+  // Doubling cube: the stake multiplier and who may (re)double next.
+  cube: number;            // 1, 2, 4, 8, … — points the game is worth
+  cubeOwner: Side | null;  // null = centred (either side may double); else only owner may
+  pendingDouble: Side | null; // side that has offered a double, awaiting take/drop
 }
 
 export interface Move {
@@ -54,6 +58,9 @@ export function newGameState(first: Side, mode: GameMode = 'classic'): GameState
     winner: null,
     rolled: false,
     mode,
+    cube: 1,
+    cubeOwner: null,
+    pendingDouble: null,
   };
 }
 
@@ -186,4 +193,76 @@ export function pipCount(g: GameState, pl: Side): number {
     if (pl === 'p' && g.board[i] < 0) total += (-g.board[i]) * (24 - i);
   }
   return total;
+}
+
+// ---------------------------------------------------------------------------
+// Heuristic bot — good enough to be a fun opponent, not a world champion.
+// Strategy: enumerate every maximal way to play the current roll, score the
+// resulting board, and keep the best. Works for classic and both Erlex modes
+// (backward moves fall out of destsFor for free).
+// ---------------------------------------------------------------------------
+
+export interface BotMove { from: Src; to: Dest; }
+
+// Board evaluation from `pl`'s point of view — higher is better.
+function evalState(g: GameState, pl: Side): number {
+  if (g.off[pl] === 15) return 1e6;
+  const o = opp(pl);
+  let s = 0;
+  // The race. A checker sent to the bar is discounted below its full 25 pips so the
+  // bot doesn't chase endless backward hits in the no-safe-zone modes (Erlex²).
+  s += (pipCount(g, o) - g.bar[o] * 13) - pipCount(g, pl);
+  s += (g.off[pl] - g.off[o]) * 14; // bearing off dominates → actively drives games to an end
+  s -= g.bar[pl] * 8;               // your own checker on the bar is bad
+  let home = 0;
+  for (let i = 0; i < 24; i++) {
+    const mine = pl === 'g' ? g.board[i] : -g.board[i]; // >0 = count of my checkers here
+    if (mine > 0 && inSafeZone(i, pl)) home += mine;    // checkers already in the home board
+    if (mine >= 2) s += 1.2;                            // a made point (block / anchor)
+    else if (mine === 1) s -= inSafeZone(i, pl) ? 0.5 : 3; // a blot — exposed unless safe
+  }
+  s += home * 0.6; // reward progress toward bearing off — breaks the symmetric backward shuffle
+  return s;
+}
+
+// Best full play for the current roll, as an ordered list of single moves.
+export function botBestPlay(g: GameState, pl: Side): BotMove[] {
+  let bestSeq: BotMove[] = [];
+  let bestLen = -1;
+  let bestScore = -Infinity;
+  const visit = (state: GameState, seq: BotMove[]) => {
+    let extended = false;
+    for (const src of sources(state, pl)) {
+      for (const d of new Set(state.remaining)) {
+        for (const mv of destsFor(state, src, d, pl)) {
+          extended = true;
+          visit(applyMove(state, src, mv.to, mv.die, mv.hit), [...seq, { from: src, to: mv.to }]);
+        }
+      }
+    }
+    if (!extended) {
+      // Prefer plays that use more dice (backgammon requires using as many as possible),
+      // breaking ties by board score.
+      const score = evalState(state, pl);
+      if (seq.length > bestLen || (seq.length === bestLen && score > bestScore)) {
+        bestSeq = seq; bestLen = seq.length; bestScore = score;
+      }
+    }
+  };
+  visit(g, []);
+  return bestSeq;
+}
+
+// Cube policy. Deliberately simple and pip-based.
+export function botShouldDouble(g: GameState, botSide: Side): boolean {
+  if (g.cube >= 8) return false;
+  if (!(g.cubeOwner === null || g.cubeOwner === botSide)) return false;
+  const mine = pipCount(g, botSide);
+  const theirs = pipCount(g, opp(botSide));
+  return mine <= theirs * 0.78 && mine < 130; // meaningfully ahead, game underway
+}
+export function botTakesDouble(g: GameState, botSide: Side): boolean {
+  const mine = pipCount(g, botSide);
+  const theirs = pipCount(g, opp(botSide));
+  return mine <= theirs * 1.35; // take unless the race is clearly lost
 }

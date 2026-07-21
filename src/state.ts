@@ -29,6 +29,7 @@ export interface AppState {
   scores: Scores; // per-mode: scores[mode][side]
   mode: GameMode;
   strike: number; // bumps on every hit — drives the Erlex lion strike animation
+  bot: Side | null; // side played by the computer, or null for two-player hot-seat
 }
 
 export type ClickTarget =
@@ -42,8 +43,11 @@ export type Action =
   | { type: 'UNDO' }
   | { type: 'END_TURN' }
   | { type: 'NEW_GAME'; first: Side }
-  | { type: 'SAVE_SETTINGS'; names: Record<Side, string>; colors: Record<Side, string>; scores: Scores; mode: GameMode }
-  | { type: 'RESET_SCORES' };
+  | { type: 'SAVE_SETTINGS'; names: Record<Side, string>; colors: Record<Side, string>; scores: Scores; mode: GameMode; bot: Side | null }
+  | { type: 'RESET_SCORES' }
+  | { type: 'DOUBLE' }  // current player offers to double the stake
+  | { type: 'TAKE' }    // opponent accepts the double
+  | { type: 'DROP' };   // opponent declines — offerer wins the current stake
 
 const DEFAULT_NAMES: Record<Side, string> = { g: 'Erlend', p: 'Alex' };
 const DEFAULT_COLORS: Record<Side, string> = { g: '#39ff14', p: '#ff4da6' };
@@ -91,7 +95,8 @@ function applyClickMove(st: AppState, to: Dest): AppState {
   let scores = st.scores;
   if (game.winner && !g.winner) {
     const m = st.mode;
-    scores = { ...scores, [m]: { ...scores[m], [game.turn]: scores[m][game.turn] + 1 } };
+    // a completed game is worth the current doubling-cube value
+    scores = { ...scores, [m]: { ...scores[m], [game.turn]: scores[m][game.turn] + game.cube } };
   }
   const base: AppState = {
     ...st,
@@ -125,7 +130,7 @@ function handleClick(st: AppState, t: ClickTarget): AppState {
 export function reducer(st: AppState, a: Action): AppState {
   switch (a.type) {
     case 'ROLL': {
-      if (st.game.rolled || st.game.winner) return st;
+      if (st.game.rolled || st.game.winner || st.game.pendingDouble) return st;
       const dice = [a.d1, a.d2];
       const remaining =
         a.d1 === a.d2 ? [a.d1, a.d1, a.d1, a.d1] : [a.d1, a.d2];
@@ -172,11 +177,33 @@ export function reducer(st: AppState, a: Action): AppState {
         colors: a.colors,
         scores: a.scores,
         mode: a.mode,
+        bot: a.bot,
         // apply the chosen mode to the game in progress so it takes effect at once
         game: { ...st.game, mode: a.mode },
       };
     case 'RESET_SCORES':
       return { ...st, scores: zeroScores() };
+    case 'DOUBLE': {
+      const g = st.game;
+      if (g.rolled || g.winner || g.pendingDouble) return st;
+      // only the cube owner (or either side when centred) may offer
+      if (!(g.cubeOwner === null || g.cubeOwner === g.turn)) return st;
+      return { ...st, game: { ...g, pendingDouble: g.turn } };
+    }
+    case 'TAKE': {
+      const g = st.game;
+      if (!g.pendingDouble) return st;
+      const taker = opp(g.pendingDouble); // the cube passes to whoever accepted
+      return { ...st, game: { ...g, cube: g.cube * 2, cubeOwner: taker, pendingDouble: null } };
+    }
+    case 'DROP': {
+      const g = st.game;
+      if (!g.pendingDouble) return st;
+      const winner = g.pendingDouble; // decliner concedes the pre-double stake
+      const m = st.mode;
+      const scores = { ...st.scores, [m]: { ...st.scores[m], [winner]: st.scores[m][winner] + g.cube } };
+      return { ...st, game: { ...g, winner, pendingDouble: null }, scores, selected: null, highlights: [] };
+    }
     default:
       return st;
   }
@@ -248,6 +275,7 @@ export function loadInitial(): AppState {
     scores: zeroScores(),
     mode: 'erlex',
     strike: 0,
+    bot: null,
   };
   try {
     const raw = localStorage.getItem(KEY);
@@ -257,13 +285,22 @@ export function loadInitial(): AppState {
         const asMode = (v: unknown): GameMode | null =>
           v === 'erlex' || v === 'erlex2' || v === 'classic' ? v : null;
         const mode: GameMode = asMode(s.mode) ?? asMode(s.game.mode) ?? 'erlex';
+        const asSide = (v: unknown): Side | null => (v === 'g' || v === 'p' ? v : null);
         const merged: AppState = {
           ...base,
-          game: { ...s.game, mode },
+          // normalise the doubling cube for games saved before it existed
+          game: {
+            ...s.game,
+            mode,
+            cube: Number(s.game.cube) || 1,
+            cubeOwner: asSide(s.game.cubeOwner),
+            pendingDouble: null, // never resume a mid-offer double
+          },
           names: s.names ?? base.names,
           colors: s.colors ?? base.colors,
           scores: migrateScores(s.scores),
           mode,
+          bot: asSide(s.bot),
         };
         return { ...merged, ...selectionFor(merged.game) };
       }
@@ -275,9 +312,9 @@ export function loadInitial(): AppState {
 }
 
 export function persist(st: AppState): void {
-  const { game, names, colors, scores, mode } = st;
+  const { game, names, colors, scores, mode, bot } = st;
   try {
-    localStorage.setItem(KEY, JSON.stringify({ game, names, colors, scores, mode }));
+    localStorage.setItem(KEY, JSON.stringify({ game, names, colors, scores, mode, bot }));
   } catch {
     /* storage may be unavailable (private mode) — non-fatal */
   }

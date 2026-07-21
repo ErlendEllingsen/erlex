@@ -73,6 +73,21 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 .btn.primary { background: linear-gradient(90deg, #2b6cff, #4aa8ff); color: #fff; }
 .btn.go { background: linear-gradient(90deg, var(--cg), #8affc0); color: #08110a; }
 .btn.warn { background: #3a2440; color: #ffd; }
+.btn.dbl { background: linear-gradient(90deg, var(--gold), #ffe89a); color: #241a00; }
+
+/* ---- doubling cube & bot ---- */
+.cubechip {
+  display: inline-block; margin-left: 8px; padding: 1px 7px; vertical-align: middle;
+  font-size: 14px; font-weight: 800; color: var(--gold); white-space: nowrap;
+  border: 1.5px solid color-mix(in srgb, var(--gold) 55%, transparent);
+  background: rgba(255, 213, 74, .12); border-radius: 8px;
+}
+.cubechip.pend { animation: cubePend 1s ease-in-out infinite; }
+@keyframes cubePend { 50% { box-shadow: 0 0 12px -1px var(--gold); background: rgba(255, 213, 74, .3); } }
+.cubebtns { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.thinking { font-weight: 800; color: var(--dim); font-size: 17px; letter-spacing: .3px; }
+.boardwrap { position: relative; }
+.boardwrap.locked { pointer-events: none; }
 
 /* ---- board ---- */
 .board {
