@@ -239,14 +239,14 @@ function migrateScores(raw: unknown): Scores {
 
 export function loadInitial(): AppState {
   const base: AppState = {
-    game: newGameState(Math.random() < 0.5 ? 'g' : 'p'),
+    game: newGameState(Math.random() < 0.5 ? 'g' : 'p', 'erlex'),
     history: [],
     selected: null,
     highlights: [],
     names: { ...DEFAULT_NAMES },
     colors: { ...DEFAULT_COLORS },
     scores: zeroScores(),
-    mode: 'classic',
+    mode: 'erlex',
     strike: 0,
   };
   try {
@@ -256,7 +256,7 @@ export function loadInitial(): AppState {
       if (s.game && Array.isArray(s.game.board) && s.game.board.length === 24) {
         const asMode = (v: unknown): GameMode | null =>
           v === 'erlex' || v === 'erlex2' || v === 'classic' ? v : null;
-        const mode: GameMode = asMode(s.mode) ?? asMode(s.game.mode) ?? 'classic';
+        const mode: GameMode = asMode(s.mode) ?? asMode(s.game.mode) ?? 'erlex';
         const merged: AppState = {
           ...base,
           game: { ...s.game, mode },
